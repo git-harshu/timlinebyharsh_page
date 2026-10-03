@@ -1,0 +1,501 @@
+<!--
+  timelinebyharsh — 1:1 call booking page
+  Razorpay Payment Page jaisa layout (left: description, right: payment panel)
+  ---------------------------------------------------------------
+  SETUP: <script> ke CONFIG block me:
+    1) RAZORPAY_KEY_ID   → Dashboard → Settings → API Keys
+    2) WHATSAPP_NUMBER   → 91xxxxxxxxxx
+    3) CREATE_ORDER_URL  → server endpoint (live payments ke liye zaroori)
+       ya PAYMENT_PAGE_URL → hosted Razorpay Payment Page ka link
+  ZAROORI: file:// se kholne par checkout nahi chalega — https par host kijiye.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ek call, do raaste — @timelinebyharsh 1:1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap" rel="stylesheet">
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<style>
+  :root{
+    --navy:#1B2A63;
+    --navy-soft:#2E3D74;
+    --blue:#4A72E8;
+    --blue-dark:#3A5FD0;
+    --grey:#6B7291;
+    --line:#E4E7EF;
+    --left-bg:#FAFAFB;
+    --page-bg:#EDEEF0;
+    --err:#B3341F;
+    --ok:#1F5237;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--page-bg);color:var(--navy-soft);
+    font-family:"Nunito Sans",system-ui,sans-serif;font-size:1.0625rem;line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{color:var(--navy);font-weight:800;line-height:1.22;margin:0}
+  p{margin:0 0 1.05rem;max-width:36rem}
+  a{color:var(--blue)}
+  :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+  .shell{max-width:78rem;margin:0 auto;background:var(--left-bg);min-height:100vh}
+  @media(min-width:980px){
+    .shell{display:grid;grid-template-columns:1fr 30rem;align-items:start}
+  }
+
+  /* ---------------- left: description ---------------- */
+  .desc{padding:2rem 1.5rem 2.5rem;order:2}
+  @media(min-width:980px){.desc{padding:3rem 3.5rem 4rem;order:0}}
+  .idbar{display:flex;align-items:center;gap:1.1rem;margin-bottom:2.5rem}
+  .avatar{
+    width:4.5rem;height:4.5rem;border-radius:8px;background:var(--navy);color:#fff;
+    display:grid;place-items:center;font-size:1.5rem;font-weight:800;letter-spacing:.02em;
+    box-shadow:0 2px 10px rgba(27,42,99,.18);flex:none;
+  }
+  .idbar b{font-size:1.35rem;font-weight:800;color:var(--navy);letter-spacing:.06em;text-transform:uppercase}
+
+  h1{font-size:clamp(1.9rem,4.4vw,2.6rem)}
+  .rule{width:3.75rem;height:5px;background:var(--blue);border-radius:2px;margin:1.1rem 0 2rem}
+  h2{font-size:1.4rem;margin:2.9rem 0 1rem;letter-spacing:-.01em}
+  h3{font-size:1.05rem;font-weight:700;margin:0 0 .7rem}
+  .plain{margin:0 0 1.05rem}
+  .desc p+p{margin-top:-.2rem}
+  ul{margin:.4rem 0 1.2rem;padding:0;list-style:none}
+  li{padding-left:1.4rem;position:relative;margin-bottom:.5rem;max-width:36rem;line-height:1.6}
+  li::before{content:"•";position:absolute;left:.15rem;top:-.05em;color:#9AA2BE;font-size:1.1em}
+  ul.tick li::before{content:"\2713";color:var(--blue);font-weight:700;font-size:.95em;top:0}
+  ul.cross li::before{content:"\00D7";color:#C0563E;font-weight:700;font-size:1.05em;top:0}
+  ul.flat li{padding-left:0}
+  ul.flat li::before{content:""}
+
+  .tracks{display:grid;gap:1.75rem;margin:1.1rem 0 0}
+  @media(min-width:700px){.tracks{grid-template-columns:1fr 1fr;gap:2.25rem}}
+  .track h3{padding-bottom:.45rem;border-bottom:3px solid var(--blue);display:inline-block}
+  .track.b h3{border-bottom-color:#8A6B3D}
+
+  .time{max-width:36rem;margin:.6rem 0 1.1rem}
+  .time div{display:grid;grid-template-columns:7rem 1fr;gap:1rem;padding:.8rem 0;border-bottom:1px solid var(--line)}
+  .time div:first-child{border-top:1px solid var(--line)}
+  .time span{font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;font-size:.9375rem}
+  .time p{margin:0;font-size:1rem;max-width:none}
+
+  #more{display:none}
+  #more.on{display:block}
+  .showmore{background:none;border:none;padding:0;margin:.6rem 0 0;cursor:pointer;
+    font:inherit;font-weight:700;color:#7C9BF2}
+  .showmore:hover{color:var(--blue)}
+
+  .contact{margin-top:3rem}
+  .contact h3{font-size:1.15rem;font-weight:800;margin-bottom:.7rem}
+  .contact div{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;color:var(--navy);font-weight:600}
+  .contact svg{width:1.1rem;height:1.1rem;fill:var(--navy);flex:none}
+  .terms{margin-top:2rem}
+  .terms h3{font-size:1.15rem;font-weight:800;margin-bottom:.5rem}
+  .terms p{color:var(--grey);font-size:.9375rem}
+  .rzpfoot{margin-top:2.25rem;padding-top:1.5rem;border-top:1px solid var(--line);color:var(--grey);font-size:.875rem}
+  .rzpfoot b{display:block;color:var(--blue);font-size:1.15rem;font-weight:800;margin-bottom:.6rem;letter-spacing:-.02em}
+
+  /* ---------------- right: payment panel ---------------- */
+  .paywrap{order:1;background:#fff;box-shadow:0 0 24px rgba(27,42,99,.07)}
+  @media(min-width:980px){.paywrap{order:0;position:sticky;top:0;min-height:100vh;display:flex;flex-direction:column}}
+  .payhead{padding:2rem 1.75rem 0}
+  .payhead h2{font-size:1.5rem;margin:0}
+  .payhead .rule{margin:.9rem 0 1.6rem}
+  .payform{padding:0 1.75rem 1.5rem;flex:1}
+
+  .field{margin-bottom:1.15rem}
+  label{display:block;font-size:.9375rem;color:var(--grey);margin-bottom:.4rem}
+  label i{color:#E05B44;font-style:normal}
+  label .opt{font-size:.8125rem}
+  input,select,textarea{
+    width:100%;font:inherit;font-size:1rem;color:var(--navy);background:#fff;
+    border:1px solid #CFD4E2;border-radius:4px;padding:.7rem .8rem;
+  }
+  textarea{min-height:4.5rem;resize:vertical}
+  select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--grey) 50%),linear-gradient(135deg,var(--grey) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(74,114,232,.14)}
+  input[readonly]{background:#F7F9FE;border-color:#C9D5F5;font-weight:700}
+  .phone{display:grid;grid-template-columns:5.5rem 1fr}
+  .phone span{display:grid;place-items:center;border:1px solid #CFD4E2;border-right:none;border-radius:4px 0 0 4px;color:var(--navy);font-size:.9375rem}
+  .phone input{border-radius:0 4px 4px 0}
+  .bad input,.bad select,.bad textarea,.bad .phone span{border-color:var(--err)}
+  .err{display:none;font-size:.8125rem;color:var(--err);margin:.3rem 0 0}
+  .bad .err{display:block}
+  .hint{font-size:.8125rem;color:var(--grey);margin:.3rem 0 0}
+  #trackB{display:none;padding-left:.85rem;border-left:2px solid var(--line);margin-bottom:1.15rem}
+  #trackB.on{display:block}
+
+  .paybar{
+    display:grid;grid-template-columns:1fr auto;align-items:stretch;gap:0;
+    border-top:1px solid var(--line);background:#F7F8FA;position:sticky;bottom:0;
+  }
+  .methods{display:flex;align-items:center;justify-content:center;gap:.65rem;padding:.9rem 1rem;
+    font-size:.75rem;font-weight:800;color:#5A6484;letter-spacing:.02em;flex-wrap:wrap}
+  .methods s{text-decoration:none;font-style:italic}
+  .pay{
+    border:none;cursor:pointer;background:var(--blue);color:#fff;
+    font:inherit;font-size:1.0625rem;font-weight:700;padding:1.15rem 2rem;
+  }
+  .pay:hover{background:var(--blue-dark)}
+  .pay[disabled]{opacity:.6;cursor:progress}
+  .formstate{display:none;font-size:.9375rem;border-radius:4px;padding:.75rem .85rem;margin:0 1.75rem 1.25rem;line-height:1.5}
+  .formstate.show{display:block}
+  .formstate.ok{background:#EEF6F1;color:var(--ok);border:1px solid #BFD9C9}
+  .formstate.no{background:#FDF3F1;color:var(--err);border:1px solid #E6C3B9}
+  .confirm{padding:2.5rem 1.75rem}
+  .confirm .tick{width:3.5rem;height:3.5rem;border-radius:50%;background:#E9F5EE;color:#1F8A4C;
+    display:grid;place-items:center;font-size:1.9rem;margin-bottom:1.25rem}
+  .confirm h2{font-size:1.5rem;margin:0 0 .5rem}
+  .confirm .lead{color:var(--grey);margin-bottom:1.5rem}
+  .confirm dl{display:grid;grid-template-columns:auto 1fr;gap:.6rem 1.25rem;margin:0 0 1.5rem;
+    padding:1.1rem 1.15rem;background:#F7F8FA;border:1px solid var(--line);border-radius:6px}
+  .confirm dt{color:var(--grey);font-size:.875rem;margin:0}
+  .confirm dd{margin:0;color:var(--navy);font-weight:600;font-size:.9375rem;word-break:break-all}
+  .confirm .next{font-size:.9375rem;color:var(--navy-soft)}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="shell">
+
+  <!-- ================= LEFT: DESCRIPTION ================= -->
+  <div class="desc">
+    <div class="idbar">
+      <div class="avatar">TH</div>
+      <b>Timeline by Harsh</b>
+    </div>
+
+    <h1>Ek Call, Do Raaste</h1>
+    <div class="rule"></div>
+
+    <h2 style="margin-top:0">@timelinebyharsh ki reel dekhkar aaye hain?</h2>
+    <p>Aap sahi jagah par hain. Namaste, main Harsh.</p>
+    <p>DM me do tarah ke sawaal sabse zyada aate hain — kuchh log poochhte hain ki content kaise grow karein, aur kuchh poochhte hain ki rudraksh, jaap aur vrat ki sahi vidhi kya hai.</p>
+    <p>Dono ke jawab DM me poore nahi diye ja sakte. Isliye yeh 30 minute ki 1:1 call hai.</p>
+
+    <h2>Booking Se Pehle...</h2>
+    <p>Main expectation saaf rakhna chahta hoon. Yeh aisi call nahi hai jisme 30 minute me sab kuch hal ho jaayega.</p>
+    <p>Call me sabse pehle main samjhunga:</p>
+    <ul>
+      <li>Aap kya kar rahe hain</li>
+      <li>Ab tak kya aazmaya</li>
+      <li>Aap kahan pahunchna chahte hain</li>
+      <li>Aur asal me kahan atke hain</li>
+    </ul>
+    <p>Uske baad hi main wo baat kahunga jo aap kal se shuru kar sakein.</p>
+
+    <h2>Aap Kis Raaste Par Baat Karenge</h2>
+    <p>Form me track chun lijiye — main usi taiyari ke saath call par aaunga.</p>
+    <div class="tracks">
+      <div class="track">
+        <h3>Track A — Social Media Growth</h3>
+        <ul class="tick">
+          <li>Profile, bio aur niche clarity ka audit</li>
+          <li>Aapke pichhle 9 posts par honest feedback</li>
+          <li>Pehle 3 second ka hook, retention aur thumbnail fixes</li>
+          <li>Reels ka format, length aur posting rhythm</li>
+          <li>Monetisation kab aur kaise — brand deals, digital product, DM automation</li>
+          <li>30 din ka ek simple content plan</li>
+        </ul>
+      </div>
+      <div class="track b">
+        <h3>Track B — Aadhyatmik Margdarshan</h3>
+        <ul class="tick">
+          <li>Aapki rashi ke anusaar rudraksh ka sujhav aur dharan vidhi</li>
+          <li>Nitya jaap — kaun sa mantra, kitni sankhya, kis samay</li>
+          <li>Vrat, pooja vidhi aur muhurat se judi shankayein</li>
+          <li>Ghar ke mandir ki disha aur vyavastha</li>
+          <li>Ek saral, tikne wali dincharya — 10 minute se shuru</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:1rem">30 minute me ek hi track theek se ho paata hai. Dono chahiye to do slot book kar lijiye.</p>
+
+    <h2>₹299 Kyun</h2>
+    <p>Pehle main yeh call muft karta tha. Dikkat yeh hui — log book karke aate hi nahi the, aur kuchh ko kuchh karna hi nahi tha.</p>
+    <p>Isliye ₹299 ka ek chhota commitment fee rakha. Kamai ke liye nahi — isliye ki jo vyakti fee dekar aata hai, wo 30 minute bhi poore istemaal karta hai.</p>
+
+    <h2>30 Minute Me Kya-Kya Hoga</h2>
+    <div class="time">
+      <div><span>00:00–05:00</span><p>Aap boliye. Aapki sthiti, aapka sawaal, bina rukavat.</p></div>
+      <div><span>05:00–15:00</span><p>Main sawaal poochhunga. Context ke bina salah bekaar hai.</p></div>
+      <div><span>15:00–25:00</span><p>Seedha jawab ya plan.</p></div>
+      <div><span>25:00–30:00</span><p>Teen next steps, priority ke hisaab se.</p></div>
+    </div>
+    <p style="margin-top:.9rem">Call ke 24 ghante ke andar ek chhota summary note aapke WhatsApp par aa jaayega — kya tay hua aur agle teen kadam.</p>
+
+    <div class="contact">
+      <h3>Contact Us:</h3>
+      <div>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.24l-8 4.76-8-4.76V6l8 4.75L20 6v2.24z"/></svg>
+        <span>timelinebyharsh@gmail.com</span>
+      </div>
+    </div>
+
+    <div class="terms">
+      <h3>Terms &amp; Conditions:</h3>
+      <p>Is page par di gayi jaankari aap Timeline by Harsh (page owner) aur Razorpay ke saath share karne ke liye sehmat hain, applicable laws ke anusaar.</p>
+    </div>
+
+    <div class="rzpfoot">
+      <b>Razorpay</b>
+      Payments Razorpay ke secure checkout se process hote hain — UPI, card, netbanking aur wallet.
+    </div>
+  </div>
+
+  <!-- ================= RIGHT: PAYMENT PANEL ================= -->
+  <div class="paywrap">
+    <div class="payhead">
+      <h2>Payment Details</h2>
+      <div class="rule"></div>
+    </div>
+
+    <form class="payform" id="bookForm" novalidate>
+      <div class="field">
+        <label for="amount">Amount <i>*</i></label>
+        <input id="amount" value="₹ 299.00" readonly tabindex="-1" aria-readonly="true">
+      </div>
+
+      <div class="field" id="f-name">
+        <label for="name">Naam <i>*</i></label>
+        <input id="name" name="name" autocomplete="name" placeholder="Aapka poora naam">
+        <p class="err">Naam likhna zaroori hai.</p>
+      </div>
+
+      <div class="field" id="f-email">
+        <label for="email">Email <i>*</i></label>
+        <input id="email" name="email" type="email" autocomplete="email">
+        <p class="err">Kaam karne wala email address daaliye.</p>
+      </div>
+
+      <div class="field" id="f-phone">
+        <label for="phone">WhatsApp Number <i>*</i></label>
+        <div class="phone"><span>IN +91</span><input id="phone" name="phone" inputmode="numeric" autocomplete="tel"></div>
+        <p class="hint">Slot isi number par bheja jaayega.</p>
+        <p class="err">10 digit ka number daaliye.</p>
+      </div>
+
+      <div class="field" id="f-age">
+        <label for="age">Umar / Age <i>*</i></label>
+        <input id="age" name="age" inputmode="numeric" placeholder="Jaise: 27">
+        <p class="err">Umar likh dijiye (13 se 99 ke beech).</p>
+      </div>
+
+      <div class="field" id="f-city">
+        <label for="city">City <i>*</i></label>
+        <input id="city" name="city">
+        <p class="err">City likh dijiye.</p>
+      </div>
+
+      <div class="field" id="f-handle">
+        <label for="handle">Instagram / YouTube username <i>*</i></label>
+        <input id="handle" name="handle" placeholder="@aapka_handle">
+        <p class="err">Handle ke bina audit nahi ho paayega.</p>
+      </div>
+
+      <div class="field" id="f-track">
+        <label for="track">Kis track par baat karni hai? <i>*</i></label>
+        <select id="track" name="track">
+          <option value="">Ek track chuniye</option>
+          <option>Track A — Social media growth</option>
+          <option>Track B — Aadhyatmik margdarshan</option>
+          <option>Pata nahi, call par tay karenge</option>
+        </select>
+        <p class="err">Track chun lijiye.</p>
+      </div>
+
+      <div class="field" id="f-q">
+        <label for="question">Aapka mukhya sawaal, ek vaakya me <i>*</i></label>
+        <textarea id="question" name="question" maxlength="240" placeholder="Jaise: reels par views aate hain par followers nahi badhte."></textarea>
+        <p class="err">Ek line me sawaal likh dijiye.</p>
+      </div>
+
+      <div id="trackB">
+        <div class="field">
+          <label for="birth">Janm-tithi, janm-samay, janm-sthan <span class="opt">(optional)</span></label>
+          <input id="birth" name="birth" placeholder="12 Aug 1996, 4:20 AM, Ghaziabad">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="jaap">Abhi koi jaap / vrat chal raha hai? <span class="opt">(optional)</span></label>
+          <input id="jaap" name="jaap" placeholder="Jaise: roz 108 Mahamrityunjay">
+        </div>
+      </div>
+    </form>
+
+    <div class="formstate" id="state"></div>
+
+    <div class="paybar">
+      <div class="methods"><s>UPI</s><span>VISA</span><span>Mastercard</span><s>RuPay</s><span>PCI DSS</span></div>
+      <button class="pay" type="submit" form="bookForm" id="payBtn">Pay ₹ 299.00</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ CONFIG ============
+   Key ID server se aati hai (/api/create-order), isliye yahan
+   kuchh daalne ki zaroorat nahi.
+*/
+const CONFIG = {
+  CREATE_ORDER_URL: "/api/create-order",
+  VERIFY_URL      : "/api/verify",
+  BUSINESS_NAME   : "Timeline by Harsh",
+  DESCRIPTION     : "30-min 1:1 call - commitment fee"
+};
+/* ================================= */
+
+const form = document.getElementById("bookForm");
+const btn = document.getElementById("payBtn");
+const state = document.getElementById("state");
+const trackSel = document.getElementById("track");
+const trackB = document.getElementById("trackB");
+trackSel.addEventListener("change", () => {
+  trackB.classList.toggle("on", /Track B/.test(trackSel.value));
+});
+
+function say(m, k){ state.className = "formstate show " + k; state.textContent = m; }
+function busy(t){ btn.disabled = true; btn.textContent = t; }
+function reset(){ btn.disabled = false; btn.textContent = "Pay \u20B9 299.00"; }
+function mark(id, bad){ document.getElementById(id).classList.toggle("bad", bad); }
+
+const rules = [
+  ["f-name","name", v => v.length > 1],
+  ["f-email","email", v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)],
+  ["f-phone","phone", v => /^[6-9]\d{9}$/.test(v.replace(/\D/g,"").slice(-10))],
+  ["f-age","age", v => /^\d{1,2}$/.test(v) && +v >= 13 && +v <= 99],
+  ["f-city","city", v => v.length > 1],
+  ["f-handle","handle", v => v.length > 1],
+  ["f-track","track", v => v !== ""],
+  ["f-q","question", v => v.length > 4]
+];
+const FIELD_OF = { name:"f-name", email:"f-email", whatsapp:"f-phone", age:"f-age", city:"f-city",
+                   handle:"f-handle", track:"f-track", question:"f-q" };
+
+function readForm(){
+  const d = {};
+  new FormData(form).forEach((v,k) => d[k] = String(v).trim());
+  return {
+    name: d.name, email: d.email,
+    whatsapp: (d.phone || "").replace(/\D/g,"").slice(-10),
+    age: d.age, city: d.city, handle: d.handle, track: d.track, question: d.question,
+    birth_details: d.birth || "", jaap_vrat: d.jaap || ""
+  };
+}
+function validate(f){
+  const d = { name:f.name, email:f.email, phone:f.whatsapp, age:f.age, city:f.city,
+              handle:f.handle, track:f.track, question:f.question };
+  let ok = true;
+  rules.forEach(([fid, key, test]) => {
+    const bad = !test(d[key] || "");
+    mark(fid, bad);
+    if (bad && ok) document.getElementById(fid).scrollIntoView({block:"center", behavior:"smooth"});
+    if (bad) ok = false;
+  });
+  return ok;
+}
+
+function done(f, paymentId){
+  const panel = document.querySelector(".paywrap");
+  panel.innerHTML =
+    '<div class="confirm">' +
+      '<div class="tick">\u2713</div>' +
+      '<h2>Payment successful</h2>' +
+      '<p class="lead">Aapki booking confirm ho gayi hai. Confirmation email aapke inbox me bhej diya gaya hai.</p>' +
+      '<dl>' +
+        '<dt>Naam</dt><dd>' + esc(f.name) + '</dd>' +
+        '<dt>Umar</dt><dd>' + esc(f.age) + '</dd>' +
+        '<dt>Track</dt><dd>' + esc(f.track) + '</dd>' +
+        '<dt>Amount</dt><dd>\u20B9299</dd>' +
+        '<dt>Payment ID</dt><dd>' + esc(paymentId) + '</dd>' +
+      '</dl>' +
+      '<p class="next"><b>Aage kya hoga:</b> agle 24 ghante me aapke WhatsApp number par do-teen samay bheje jaayenge. ' +
+      'Aap jo chunenge wahi slot final ho jaayega.</p>' +
+    '</div>';
+  panel.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function esc(v){
+  return String(v == null ? "" : v).replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = readForm();
+  if (!validate(f)) { say("Kuchh field adhoore hain \u2014 upar dekh lijiye.", "no"); return; }
+  state.className = "formstate";
+
+  if (location.protocol === "file:") {
+    say("Yeh page file:// se khula hai. Checkout sirf http/https par chalta hai \u2014 `vercel dev` chalaiye ya deploy kar dijiye.", "no");
+    return;
+  }
+  if (typeof Razorpay === "undefined") {
+    say("Razorpay ka checkout script load nahi hua (ad-blocker ya network). Reload kijiye.", "no");
+    return;
+  }
+
+  /* --- 1. Server par order banaiye (amount aur validation server-side) --- */
+  busy("Order ban raha hai\u2026");
+  let order;
+  try {
+    const r = await fetch(CONFIG.CREATE_ORDER_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ form: f })
+    });
+    order = await r.json();
+    if (!r.ok || !order.order_id) {
+      (order.fields || []).forEach(k => mark(FIELD_OF[k] || "f-name", true));
+      throw new Error(order.error || "order ban nahi paaya");
+    }
+  } catch (err) {
+    reset(); say("Order banane me dikkat: " + err.message, "no"); return;
+  }
+
+  /* --- 2. Checkout kholiye --- */
+  busy("Razorpay khul raha hai\u2026");
+  const rzp = new Razorpay({
+    key: order.key_id,
+    order_id: order.order_id,
+    amount: order.amount,
+    currency: order.currency,
+    name: CONFIG.BUSINESS_NAME,
+    description: CONFIG.DESCRIPTION,
+    prefill: { name: f.name, email: f.email, contact: "+91" + f.whatsapp },
+    theme: { color: "#4A72E8" },
+    retry: { enabled: true, max_count: 2 },
+    modal: {
+      ondismiss: () => { reset(); say("Payment poora nahi hua. Dobara try kar sakte hain.", "no"); }
+    },
+    /* --- 3. Success par server se verify --- */
+    handler: async (res) => {
+      busy("Verify ho raha hai\u2026");
+      try {
+        const vr = await fetch(CONFIG.VERIFY_URL, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(res)
+        });
+        const v = await vr.json();
+        if (v.valid) { done(f, res.razorpay_payment_id); return; }
+        reset();
+        say("Payment verify nahi hua (" + (v.reason || v.status || "unknown") +
+            "). Agar paisa kat gaya hai to WhatsApp par Payment ID " +
+            res.razorpay_payment_id + " bhej dijiye \u2014 main check kar lunga.", "no");
+      } catch (err) {
+        // Verify endpoint na chale to bhi payment ho chuka hai; webhook record kar leta hai
+        done(f, res.razorpay_payment_id);
+      }
+    }
+  });
+
+  rzp.on("payment.failed", (res) => {
+    reset();
+    const e2 = (res && res.error) || {};
+    say("Payment fail: " + (e2.description || "unknown") +
+        (e2.reason ? " (" + e2.reason + ")" : "") + ". Doosra method try kijiye.", "no");
+  });
+
+  rzp.open();
+});
+</script>
